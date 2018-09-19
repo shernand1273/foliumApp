@@ -3,6 +3,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 import sys
 import os
+import miniMap
 
 class DropDown():
     def __init__(self):
@@ -15,8 +16,20 @@ class DropDown():
     def getDropDownIndex(self):
         return self.stateIndex
 
+class Map():#may need this for later
+    def __init__(self):
+        self.theMap=None
+
+    def save(self,m):
+        self.theMap=m
+
+    def open(self):
+        return self.theMap
+
+
 
 storedFrame = fileData.DataFrame()
+
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
@@ -110,7 +123,7 @@ class Ui_MainWindow(object):
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
-        MainWindow.setWindowTitle(_translate("MainWindow", "Data Map"))
+        MainWindow.setWindowTitle(_translate("MainWindow", "MainWindow"))
         self.findButton.setText(_translate("MainWindow", "Find"))
         self.dropDownLabel.setText(_translate("MainWindow", "Data"))
         self.fileDropDown.setItemText(0, _translate("MainWindow", "---Select Data---"))
@@ -142,14 +155,53 @@ class Ui_MainWindow(object):
             self.buildMap(self.data)
 
     def find(self):
-        print("I shall find something for you")
-        #use the dropdown return value from the object's dictionary
-        #self.fileValue = self.selection.getDropDownIndex()
-        #if(self.fileValue==0):
-            #use a popup box to let the user know that he has to select a data file from the dropdown
-           # print("You have to select something")
-        #else:
-           # print(self.fileDropDown.currentText())
+        self.searchText= self.search.text()
+        self.searchText = self.searchText.title()#sets the first letter of each word to upper case, which is what the data expects
+        self.dataFound = None
+
+        #first check that the user has entered something in the search field.
+        if(len(self.searchText)==0):
+            print("Nothing Entered") #use a popup to let the user know that he needs to enter somthing
+        #now that we know the user entered something, lets retrieve the stored data frame, but first lets check that the dropdown menu is something onther than --select-- which is nothing
+
+        elif(len(self.searchText)>0):
+            if(self.fileDropDown.currentText()=="---Select Data---"):
+
+                ###################TO DO: Call a popup window######################
+                print("Select a data list to load and search through")
+                #####################################################
+            else:
+                #here we are retrieving the stored dataframe, which will return the table belonging to whichever map the user chooses to load
+                self.dataTable= storedFrame.getStoredDataFrame()
+                #because we are retrieving a pandas data frame, we need to set the index to "NAME" because that is what the user is suppossed to enter
+                self.temp=self.dataTable.set_index("NAME")
+
+
+                #Now we are using the .loc method to find the name entered by the user in the table index
+
+                try:#we will try to find the search text with this method
+                    self.information = self.temp.loc[self.searchText]#this is going to get passed to the popup box and the build single map function
+                    self.cordinates = self.temp.loc[self.searchText,"LAT":"LON"]#we are also passing
+                    #the statement above returns a panda series, we need to convert that into a list so that we can use the values
+                    self.cordinates= list(self.cordinates)
+                    self.dataTitle.setText("{} found in {}".format(self.searchText, self.fileDropDown.currentText()))
+
+                    #######################################################
+
+                    #when the object is found, create a new map, then load it with the marker of the object
+
+                    #self.buildSinglePointMap(self.information,self.cordinates)
+                    miniMap.showMiniMap(self.searchText,self.information,self.cordinates,self.fileDropDown.currentText())
+
+
+
+                    ######################################################3
+
+
+                except:#we are using an exception because if the .loc doesn't find anything, it can crash the program
+                    self.dataTitle.setText("Nothing found in {}".format(self.fileDropDown.currentText()))
+
+
 
     def buildMap(self,df):
         #df - this is the data frame we are going to work with
@@ -172,27 +224,31 @@ class Ui_MainWindow(object):
         self.lon = list(df["LON"])
         self.elev= list(df["ELEV"])
 
+        #this is just going to center the map around the united states as a point to start
         map =folium.Map(location = [41.5,-102.35],tiles ="Stamen Terrain",zoom_start =4.5)
 
-
-        for i in range(df.shape[0]):
+        #we are going to loop through the lists in order to add all the points within the file to the map
+        for i in range(self.index):
             name =self.name[i]
             latit=self.lat[i]
             longit=self.lon[i]
             elevat=self.elev[i]
-
+            #creating the popup text.
             pop=folium.Popup("{}, Elev: {}m".format(name,elevat),parse_html=True)
-
+            #this creates the point on the marker according to LAT and LON and attaches the popup to the marker
             map.add_child(folium.Marker(location =[latit,longit], popup =pop))
 
+        self.loadMap(map)
 
-        map.save("map.html")
-        #this will add the html file to the QWebview engine
+    def loadMap(self,theMap):
+        theMap.save("map.html")
+        # this will add the html file to the QWebview engine
         file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "map.html"))
         url = QtCore.QUrl.fromLocalFile(file_path)
         self.mapView.load(url)
 
-
+    def testing(messgage):
+        print(message)
 
 def main():
 
